@@ -1,0 +1,39 @@
+#!/bin/bash
+# 
+# This is an example prestaging file
+# It doesn't do anything. Use this and the default.bogo files
+# as frameworks to build your own staging file.
+# 
+
+option=$1         
+
+strain=$2
+target=$3
+
+Prestage()
+{
+	echo "This is an example prestaging script"
+	echo "Pretend that something important is going on here"
+	printvar
+}
+
+Stage()
+{
+	echo "This is an example staging script"
+	echo "Pretend that something important is going on here"
+	printvar
+}
+
+printvar()
+{
+	echo "These are the arguments Bogo is passing to this script:"
+	echo "Option: $option"
+	echo "Strain: $strain"
+	echo "Target: $target"
+}
+
+case $option in
+	"prestage") Prestage;;
+	"stage") Stage;;
+	*) exit 2;;
+esac

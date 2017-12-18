@@ -1,0 +1,162 @@
+#!/bin/bash
+# Hopps
+VERSION="0.1"
+
+Exit()
+{
+	if [[ -e _hopps.tmp ]]; then
+		rm _hopps.tmp
+	fi
+	echo -ne "\n"
+}
+
+Log()
+{
+	if [[ -e $HOPPS_CUBICAL/log.hopps ]] && [[ ! -w $HOPPS_CUBICAL/log.hopps ]]; then
+		echo ":: Log permissions are borked :/"
+		rm -f $HOPPS_CUBICAL/log.hopps
+	fi
+	
+	if [[ $HOPPS_VERBOSE_LOG == "Y"* ]] || [[ $HOPPS_VERBOSE_LOG == "y"* ]]; then
+		echo ":: $1"
+		echo -ne "$(date)\t $1\n" >> $HOPPS_CUBICAL/log.hopps
+	fi
+}
+
+CheckLocalExec()
+{
+	# Still need to do more, but this is a start
+	
+	if [[ -e /usr/bin/$1 ]] || [[ -e /bin/$1 ]]; then
+		Log "$1 found in /usr/bin!"
+		return 1
+	fi
+	
+	return 0
+}
+
+HoppsCheckConfig()
+{
+	local x=0
+	
+	if [[ ! -e $HOPPS_WILDE_SIG ]]; then
+		Log "Wilde signature doesn't exist: $HOPPS_WILDE_SIG"
+		Error warn "Can't find wilde's signature"
+		x=2
+	fi
+	
+	if [[ ! -e $HOPPS_SCOPE ]]; then
+		Log "Scope doesn't exist: $HOPPS_SCOPE"
+		Error warn "Scope doesn't exist!"
+		x=2
+	elif [[ ! -w $HOPPS_SCOPE ]]; then
+		Log "Scope unwritable: $HOPPS_SCOPE"
+		Error warn "Scope exists, but I can't write to it"
+		x=2
+	fi
+	
+	if [[ $HOPPS_DAYS_INACTIVE -lt 0 ]] || [[ $HOPPS_DAYS_INACTIVE -gt 65536 ]]; then
+		Log "Insane value for HOPPS_DAYS_INACTIVE: $HOPPS_DAYS_INACTIVE"
+		Error warn "Setting HOPPS_DAYS_INACTIVE to 50, since given value is insane"
+		x=2
+	fi
+	
+	if [[ ! -e $HOPPS_TASK_FILE ]]; then
+		Log "tasks.hopps does not exist: $HOPPS_TASK_FILE"
+		Error warn "Can't find my task file!"
+		x=1
+	else
+		Log "Sourcing $HOPPS_TASK_FILE"
+		source $HOPPS_TASK_FILE
+	fi
+
+	case $x in
+		1)
+			return 1;;
+		2)
+			Log "Soft errors in config"
+			return 0;;
+		0)
+			return 0;;
+	esac 
+	return 69
+}
+
+TaskHeader()
+{
+	echo -ne "\n===> $1\n"
+}
+
+TaskRootSafe()
+{
+	IAmGroot
+	if [[ $? == 0 ]]; then
+		if [[ "$1" == "N"* ]] || [[ "$1" == "n"* ]]; then
+			# Need a better way to handle this
+			Error fatal "Not allowing task to execute as root"
+		fi
+	fi
+}
+
+GuessType()
+{
+	case $1 in
+		["/home/"]*)
+			name=${1##/home/}
+			echo "Adding user \"$name\""
+			;;
+		["/"]*)	
+			echo "Adding file \"$1\""
+			;;
+		*)
+			echo "Adding user \"$1\""
+			;;
+	esac 
+	echo ""
+}
+
+CommitFile()
+{
+	if [[ -e $BOGO_TARGETS_DIR/$1 ]]; then
+		Error warn "$1 already exists in targets directory!"
+		return 1
+	fi
+	
+	
+}
+
+source zpd.subr
+SourceGlobal
+Log "--- [ START ] ---"
+if [[ $PWD != $ZHS_BASE ]]; then
+	Log "Moving to $ZHS_BASE"
+	cd $ZHS_BASE
+fi
+Header HOPPS2
+HoppsCheckConfig
+if [[ $? != 0 ]]; then
+	Error fatal "Errors in configuration - can't continue"
+fi
+
+if [[ -z $HOPPS_TASKS ]]; then
+	echo "Someone forgot to give me tasks!"
+	Exit
+else
+	Log "Deleting _hopps.tmp"
+	rm -f _hopps.tmp
+	for i in ${HOPPS_TASKS[@]}; do
+		# **** UBER DANGEROUS ****
+		Log "Attempting to execute $i"
+		CheckLocalExec $i
+		if [[ $? != 0 ]]; then
+			echo "Skipping foreign executable \"$i\"... tsk tsk"
+		else
+			echo -ne "\nExecute $i? (Y/N) "
+			read aa
+			if [[ $aa == "Y" ]] || [[ $aa == "y" ]]; then
+				$i
+			fi
+		fi
+	done
+	echo -ne "\nDone!\n"
+fi

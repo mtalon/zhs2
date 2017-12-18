@@ -1,0 +1,6 @@
+WildeAlias=test
+WildeIsSavage=false
+ModInclude=(mod/test.m)
+Payload=self
+RequireStaging=true
+StagingFile=example.stage

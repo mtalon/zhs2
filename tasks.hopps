@@ -1,0 +1,130 @@
+Example()
+# Example of a task
+{
+	# Start the command with TaskHeader then enter your code below
+	# If its not safe to run the task as root, set TaskRootSafe to no
+	# 
+	# If you need to write something to a temporary file, use _hopps.tmp
+	#
+	# Hopps directly executes these methods with very little sanity checks.
+	# When creating tasks, you should start them with capital letter so they
+	# are not confused with local binaries on the system
+	
+	TaskHeader "Executing example task"
+	TaskRootSafe no
+	echo -e "
+	 ------------------------
+	       Hello World
+	 ------------------------
+	HOPPS_CUBICAL           $HOPPS_CUBICAL
+	HOPPS_TASK_FILE         $HOPPS_TASK_FILE
+	HOPPS_WILDE_SIG         $HOPPS_WILDE_SIG
+	HOPPS_GENERATE_HITLIST  $HOPPS_GENERATE_HITLIST
+	HOPPS_COPY_MAIL         $HOPPS_COPY_MAIL
+	HOPPS_DELETE_OLD        $HOPPS_DELETE_OLD
+	HOPPS_DAYS_INACTIVE     $HOPPS_DAYS_INACTIVE
+	HOPPS_VERBOSE_LOG       $HOPPS_VERBOSE_LOG
+	"
+}
+
+make_target()
+{
+	TaskHeader "Creating target file"
+	TaskRootSafe no
+	
+	local x=0
+	echo "What kind of file do you want to make?"
+	echo "1: Target - List of users or files to ATTACK"
+	echo "2: Ally   - List of users or files to SPARE from infection"
+	while [[ $x -eq 0 ]]; do
+		read a
+		if [[ $a != "1" ]] && [[ $a != "2" ]]; then
+			echo "Enter 1 or 2"
+		else
+			x=1
+		fi
+	done
+	x=0
+	local i=0
+	echo ""
+	echo "Enter the names of users or files you want to include, one at a time."
+	echo "For best results, try to specify the full path, omitting the last \"/\"."
+	echo "I'll do my best to guess the type. If I'm wrong, you may have to manually"
+	echo "edit the final file."
+	echo ""
+	echo "When you're finished, hit enter without entering anything"
+	while [[ $x -eq 0 ]]; do
+		read b
+		if [[ -z $b ]]; then
+			x=1
+		else
+			GuessType $b
+			fileadd[$i]=$b
+			((i++))
+		fi
+	done
+	
+	x=0
+	echo ""
+	echo "What name do you want to call this file?"
+	while [[ $x -eq 0 ]]; do
+		read c
+		if [[ -z $c ]]; then
+			echo "Can't be blank!"
+		else
+			x=1
+		fi
+	done
+	
+	if [[ $a == 1 ]]; then
+		nfile="targets_"
+	else
+		nfile="allies_"
+	fi
+	echo ""
+	nfile="$nfile$c.bogo"
+	echo "$nfile:"	
+	x=0
+	for x in ${fileadd[@]}; do
+		echo $x
+	done
+	echo -ne "\nDoes the above look correct? (Y/N) "
+	read d
+	if [[ $d == "Y" ]] || [[ $d == "y" ]]; then
+		touch $BOGO_TARGETS_DIR/$nfile
+		for x in ${fileadd[@]}; do
+			echo $x >> $BOGO_TARGETS_DIR/$nfile
+		done
+	fi
+}
+
+GrabMail()
+{
+	TaskHeader "Consolidating mail"
+	TaskRootSafe yes
+	if [[ -z  $clean_user ]]; then
+		echo "There are no valid users to grab mail from :("
+	else
+		for i in ${clean_user[@]}; do
+			name=${i##$HOPPS_SCOPE/}
+			echo -e "$name\\t--> $dir_hopps/usermail/$name"
+			if [[ ! -e $HOPPS_CUBICAL/usermail ]]; then
+				mkdir $dir_hopps/usermail
+			fi
+			if [[ ! -e $HOPPS_CUBICAL/usermail/$name ]]; then
+				mkdir $dir_hopps/usermail/$name
+			fi
+			if [[ -e $i/mail/Sent ]]; then
+				cp -f $i/mail/Sent $HOPPS_CUBICAL/usermail/$name/
+			fi
+			if [[ -e $i/mail/Drafts ]]; then
+				cp -f $i/mail/Drafts $HOPPS_CUBICAL/usermail/$name/
+			fi
+			if [[ -e $i/mail/Trash ]]; then
+				cp -f $i/mail/Trash $HOPPS_CUBICAL/usermail/$name/
+			fi
+			cp -f /var/spool/mail/$name $HOPPS_CUBICAL/usermail/$name/Recieved
+		done
+		chmod 755 -R $HOPPS_CUBICAL
+	fi
+}

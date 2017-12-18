@@ -1,0 +1,7 @@
+This directory contains methods used to deploy, or "stage" a strain of wilde.
+
+Stage files here are executed directly by Bogo.
+
+When a strain is configured with RequireStaging to false, the default.bogo
+stage is called.
+

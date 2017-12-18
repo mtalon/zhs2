@@ -1,0 +1,5 @@
+This directory contains exploits that bogo can use in order to elevate permissions
+to sucessfully deploy a strain.
+
+This directory is completely optional, and is currently not even used.
+

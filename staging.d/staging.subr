@@ -1,0 +1,11 @@
+#!/bin/bash
+# This file contains subroutines used help build staging files
+
+IsPathAccessable()
+{
+	[ ! -e $1 ] && return 1
+	[ ! -r $1 ] && return 2
+	[ ! -w $1 ] && return 3
+	return 0
+}
+

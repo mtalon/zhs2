@@ -2,21 +2,7 @@
 # Bogo version 2
 # Written by Michael Talon
 
-VERSION="v2.0 RC1"
-
-PuppetInit()
-# Initalize puppets - DEPRECIATED
-{
-	if [[ ! -e $BOGO_PUPPETS_DIR ]]; then
-		Error note "No puppet file was given - using default"
-		BOGO_PUPPETS_DIR=$ZHS_BASE/stash
-		if [[ ! -e $BOGO_PUPPETS_DIR ]]; then
-			echo "Creating $BOGO_PUPPETS_DIR"
-			mkdir $BOGO_PUPPETS_DIR
-		fi
-	fi
-	VarCheck $BOGO_PUPPETS_DIR
-}
+VERSION="RC2"
 
 HitBanner()
 # Fancy banner to warn user of a hit operation
@@ -47,9 +33,6 @@ SourceStrain()
 	if [[ -e $BOGO_STRAINS_DIR/$1 ]]; then
 	# [[ ${target_strains[*]} =~ "$1" ]]
 		source $BOGO_STRAINS_DIR/$1
-		if [[ $RequireStaging == "false" ]]; then
-			StagingFile=$BOGO_DEFAULT_STAGING
-		fi
 		return 0
 	fi
 	return 1
@@ -59,6 +42,10 @@ BogoCheckConfig()
 # Absolutely disgusting. Kill yourself
 {
 	local x=0
+	if [[ ! -e $ZHS_BASE ]]; then
+		Error warn "ZHS_BASE does not exist - check config"
+		x=1
+	fi
 	if [[ ! -e $BOGO_TARGETS_DIR ]]; then
 		Error warn "Targets directory does not exist"
 		x=1
@@ -79,14 +66,6 @@ BogoCheckConfig()
 		x=1
 	elif [[ ! -w $BOGO_STRAINS_DIR ]]; then
 		Error warn "Strains directory is not writable"
-		x=1
-	fi
-	
-	if [[ ! -e $BOGO_HAX_DIR ]]; then
-		Error warn "Hax directory does not exist"
-		x=1
-	elif [[ ! -w $BOGO_HAX_DIR ]]; then
-		Error warn "Hax directory is not writable"
 		x=1
 	fi
 	
@@ -126,13 +105,24 @@ StrainBuild()
 	if [[ $1 != *".strain" ]]; then
 		return 69
 	fi
+	
+	# Lazily check that the .strain file is actually a strain file
+	if [[ $(cat $1) != *"WildeAlias="* ]]; then
+		return 69
+	fi
+	
+	
 	declare -a ModInclude
 	SourceStrain $1
+	if [[ $? != 0 ]]; then
+		Error warn "Failed to source $1..."
+		echo "...wait what the fuck? That shouldn't happen!"
+		Bug StrainBuild 133
+	fi
 	echo "==> $1"
 	StrainConfigCheck $1
 	if [[ $? != 0 ]]; then
 		Msg n 4 "Build failed: errors in config"
-		echo ""
 		return 1
 	fi
 	Msg n 4 "Config looks ok"
@@ -147,6 +137,8 @@ StrainBuild()
 		2)	Msg n 4 "Build skipped"
 			echo ""
 			return 4;;
+		*)	Msg n 4 "AssembleStrain: Bad return...?"
+			Bug StrainBuild 158;;
 	esac
 }
 
@@ -195,17 +187,26 @@ AssembleStrain()
 		# If file is executable, execute it and pipe its output to final product
 		if [[ $(cat $i) == *"#!/"* ]]; then
 			if [[ ! -x $i ]]; then
-				Msg err 4 "Module not marked as executable - fixing that now"
-				chmod +x $i
+				Msg err 4 "Module ${i##$ZHS_BASE/} is not marked as executable"
+				Msg n 8 "Do you want me to correct this?"
+				Msg n 8 "If you don't recognize this module, SAY NO and remove it"
+				Msg n 8 "from the strain file!"
+				echo -ne "        (Y/N) "
+				read ab
+				if [[ $ab == "Y" ]] || [[ $ab == "y" ]]; then
+					chmod +x $i
+				else
+					return 2
+				fi
 				if [[ $? != 0 ]]; then
-					Msg err 4 "BUG: chmod failed - that shouldn't happen!"
+					Msg err 4 "Uh, what the fuck. chmod failed...?"
 					Bug AssembleStrain 202
 				fi
 			fi
 			$i >> $BOGO_STRAINS_DIR/$WildeAlias
 			if [[ $? != 0 ]]; then
 				Msg err 4 "Module failed to execute - aborting build\n"
-				return 3
+				return 1
 			fi
 			
 		else
@@ -246,6 +247,7 @@ AssembleStrain()
 			if [[ ! -x $PayloadLocation ]]; then
 				# We shouldn't end up here
 				Msg n 4 "Where the fuck is the payload??"
+				Bug AssembleStrain 255
 			fi
 			;;
 	esac
@@ -288,7 +290,7 @@ StrainConfigCheck()
 			Msg err 4 "Not allowing savage strain to be built!"
 			return 3
 		else 
-			Msg err 4 "Strain marked as savage!"
+			Msg err 4 "Strain marked as savage - proceeding with caution"
 		fi
 	fi
 	
@@ -351,8 +353,10 @@ StrainConfigCheck()
 	
 	local x=0
 	for i in ${ModInclude[@]}; do
-		if [[ ! -r $ZHS_BASE/$i ]]; then
+		if [[ ! -e $ZHS_BASE/$i ]]; then
 			Msg n 4 "Ignoring non existant module $i"
+		elif [[ ! -r $ZHS_BASE/$i ]]; then
+			Msg n 4 "Ignoring unreadable module $i (bad permissions?)"
 		else
 			GoodMod[$x]=$ZHS_BASE/$i
 			((x++))
@@ -375,20 +379,25 @@ ParseStrain()
 
 UserListCustom()
 {
-	case $1 in
+	local type=$1
+	case $type in
 		"targets")	list=$BOGO_TARGETS_DIR;;
-		"strains")	list=$BOGO_STRAINS_DIR;;
+		"strains")	list=$BOGO_STRAINS_DIR
+					type="strain";;
 		"hax")	list=$BOGO_HAX_DIR;;
 	esac
 	
 	for file in $list/*; do
 		file=${file##$list/}
-		if [[ $file == *"$1"* ]]; then
-			echo "$file { "
-			while IFS='' read -r line || [[ -n "$line" ]]; do
-				echo "   $line"
-			done < $list/$file
-			echo "}"
+		if [[ $file == *"$type"* ]]; then
+			((count++))
+			if [[ -z $2 ]]; then
+				echo "$file { "
+				while IFS='' read -r line || [[ -n "$line" ]]; do
+					echo "   $line"
+				done < $list/$file
+				echo "}"
+			fi
 		fi
 	done
 }
@@ -402,15 +411,17 @@ UserList()
 			;;
 		"targets")
 			dir1="$BOGO_TARGETS_DIR"
-			dir2=bogo
+			dir2=targets
 			;;
 		"")
 			echo "Listing contents of all linked directories"
 			echo ""
 			dir2=strain
 			UserListCustom strains
-			dir2=tragets
+			echo ""
+			dir2=targets
 			UserListCustom targets
+			return 0
 			;;
 		*)
 			echo "List what? Strains or targets?"
@@ -426,47 +437,39 @@ UserList()
 	fi
 }
 
-
-ReadFile()
-# Check that our targets are accesible
-{
-	i=0
-	while IFS='' read -r line || [[ -n "$line" ]]; do
-		ArrayHasValue "$line" "${targets_go[@]}"
-		if [[ $? == 0 ]]; then
-			if [[ -z $z ]]; then
-				echo "Ignoring duplicates in hitlist... dammit hopps"
-				z=1
-			fi
-		else
-			if [[ -e $line ]]; then
-				targets_go[$i]=$line
-				((i++))
-			fi
-		fi
-	done < "$1"
-}
-
-
 HelpBrief()
 {
 	echo ""
 	echo "Usage: bogo [ACTION] [ARGUMENT]"
 	echo ""
 	echo "ACTIONS:"
-	echo "   hit all        ->   Hit all targets in target directory"  
-	echo "   hit filename   ->   Hit targets named in the file 'filename'"
+	echo "   hit all           Hit all targets in target directory"  
+	echo "   hit filename      Hit targets named in the file 'filename'"
 	echo ""
-	echo "   build          ->   Build all stains of wilde in the strains"
-	echo "                       directory"
-	echo "   build filename ->   Build only strain 'filename'" 
+	echo "   build             Build all stains of wilde in the strains"
+	echo "                     directory"
+	echo "   build filename    Build only strain 'filename'" 
 	echo ""
-	echo "   help           ->   Print detailed usage information"
+	echo "   help              Print detailed usage information"
 	echo ""
-	echo "ZPD Location:     $ZHS_BASE"
-	echo "Target Location:  $BOGO_TARGETS_DIR"
-	echo "Strains Location: $BOGO_STRAINS_DIR"
-	echo "Staging Location: $BOGO_STAGE_DIR"
+	echo "ZPD:               $ZHS_BASE"
+	echo "Target Directory:  $BOGO_TARGETS_DIR"
+	echo "Strain Directory:  $BOGO_STRAINS_DIR"
+	echo "Staging Directory: $BOGO_STAGE_DIR"
+	echo ""
+	UserListCustom targets stfu
+	if [[ -z $count ]]; then
+		echo "No targets in target directory"
+	else
+		echo "Found $count target file(s)"
+	fi
+	count=0
+	UserListCustom strains stfu
+	if [[ -z $count ]]; then
+		echo "No strains in strains directory"
+	else
+		echo "Found $count strain file(s)"
+	fi
 	echo ""
 }
 
@@ -500,7 +503,7 @@ ParseTarget()
 					else
 						CheckTargetStrain $UseStrain $potarg
 					fi
-				else
+				elif [[ ! -z $line ]] && [[ ! $line == "" ]]; then
 					PathCheck $line
 					case $? in
 						2)
@@ -573,10 +576,19 @@ HitStage()
 {
 	local targ=$1
 	local strain=$2
-	SourceStrain $BOGO_STRAINS_DIR/$strain
+	SourceStrain $strain
+	if [[ $? != 0 ]]; then
+		Error warn "Failed to source $strain"
+		echo "...wait what the fuck? That shouldn't happen!"
+		Bug HitStage 606
+	fi
 
 	if [[ $RequireStaging == "true" ]]; then
 		Msg n 4 "Executing external staging file"
+		if [[ -z $StagingFile ]]; then
+			Msg err 4 "Where did our staging file go??"
+			Bug HitStage 617
+		fi
 		$BOGO_STAGE_DIR/$StagingFile stage $WildeAlias $targ &> _bogo.tmp
 		x=$?
 		st=$StagingFile
@@ -685,16 +697,9 @@ UserHit()
 		fi
 	done
 	
-	if [[ $rt == 1 ]] && [[ -e $WildeAlias ]]; then
-		Error note "Strain \"$WildeAlias\" failed to build, but a build from a "
-		Msg n 6 "previously successful attempt exists."
-		echo -ne "      Do you want to use this older build instead? (Y/N) "
-		read a
-		if [[ $a != "Y" ]] && [[ $a != "y" ]]; then
-			echo -ne "\nAborting hit operation - failed to build strain\n"
-			return 1
-		fi
-		
+	if [[ $rt == 1 ]]; then
+		echo -ne "\nAborting hit operation - failed to build strain\n"
+		return 1
 	fi
 	
 	# Building process moves PWD to strains directory to simplify output
@@ -829,19 +834,24 @@ UserHit()
 	Msg n 3 "Press ENTER to continue, or CONTROL + C to abort."
 	read ab
 	
+	# Fix this. Oh my god please fix this.
 	for i in ${targets_go[@]}; do
 		targ=$i
-		strain=${strains_go[0]}
-		Banner "ATTEMPTING TO INFECT $targ"
-		HitStage $targ test.strain
-		if [[ $? != 0 ]]; then
-			Msg n 4 "INFECTION FAILED\n"
-			if [[ $BOGO_ON_FAIL == "abort" ]]; then
-				break
+		for j in ${target_strains[@]}; do
+			if [[ $(cat $BOGO_TARGETS_DIR/${j%|*} | grep $targ) ]]; then
+				strain=${j#*|}
+				Banner "ATTEMPTING TO INFECT $targ"
+				HitStage $targ $strain
+				if [[ $? != 0 ]]; then
+					Msg n 4 "INFECTION FAILED\n"
+					if [[ $BOGO_ON_FAIL == "abort" ]]; then
+						break
+					fi
+				else
+					Msg n 4 "Infection successful\n"
+				fi
 			fi
-		else
-			Msg n 4 "Infection successful\n"
-		fi
+		done
 	done
 	
 }
@@ -893,7 +903,11 @@ UserBuild()
 		Msg n 9 "without arguments"
 		return 0
 	else
-		StrainBuild $BOGO_STRAINS_DIR/$1
+		StrainBuild $1
+		if [[ $? != 0 ]]; then
+			Error warn "StrainBuild failed for $1??"
+			Bug UserBuild 936
+		fi
 	fi
 	
 	if [[ $? == 69 ]]; then
@@ -1030,7 +1044,7 @@ SourceGlobal
 if [[ $PWD != $ZHS_BASE ]]; then
 	cd $ZHS_BASE
 fi
-Header BOGO
+Header BOGO2
 IAmGroot
 if [[ $? == 0 ]]; then
 	echo -ne "Running with root credentials\n\n"

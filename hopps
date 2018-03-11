@@ -1,6 +1,6 @@
 #!/bin/bash
 # Hopps
-VERSION="0.1"
+VERSION="dev2"
 
 Exit()
 {
@@ -38,12 +38,6 @@ CheckLocalExec()
 HoppsCheckConfig()
 {
 	local x=0
-	
-	if [[ ! -e $HOPPS_WILDE_SIG ]]; then
-		Log "Wilde signature doesn't exist: $HOPPS_WILDE_SIG"
-		Error warn "Can't find wilde's signature"
-		x=2
-	fi
 	
 	if [[ ! -e $HOPPS_SCOPE ]]; then
 		Log "Scope doesn't exist: $HOPPS_SCOPE"
@@ -127,36 +121,15 @@ CommitFile()
 
 source zpd.subr
 SourceGlobal
-Log "--- [ START ] ---"
-if [[ $PWD != $ZHS_BASE ]]; then
-	Log "Moving to $ZHS_BASE"
-	cd $ZHS_BASE
-fi
-Header HOPPS2
 HoppsCheckConfig
+
 if [[ $? != 0 ]]; then
 	Error fatal "Errors in configuration - can't continue"
 fi
-
-if [[ -z $HOPPS_TASKS ]]; then
-	echo "Someone forgot to give me tasks!"
-	Exit
-else
-	Log "Deleting _hopps.tmp"
-	rm -f _hopps.tmp
-	for i in ${HOPPS_TASKS[@]}; do
-		# **** UBER DANGEROUS ****
-		Log "Attempting to execute $i"
-		CheckLocalExec $i
-		if [[ $? != 0 ]]; then
-			echo "Skipping foreign executable \"$i\"... tsk tsk"
-		else
-			echo -ne "\nExecute $i? (Y/N) "
-			read aa
-			if [[ $aa == "Y" ]] || [[ $aa == "y" ]]; then
-				$i
-			fi
-		fi
-	done
-	echo -ne "\nDone!\n"
-fi
+case $1 in
+	"task")
+		$2 $3 $4;;
+	*)
+		echo -ne "Judy Hopps, ready to make the world a better place!\n"
+		;;
+esac

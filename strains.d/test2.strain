@@ -1,0 +1,5 @@
+StrainInclude=test.d/test.m
+Payload=none
+StagingFile=default.stage
+PrestageArgs=
+PrestageFile=mktargs.stage

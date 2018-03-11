@@ -1,0 +1,70 @@
+gen-target-files()
+# Generate a bunch of target files filled with fake targets
+{
+	
+	RANDOM_RANGE_MIN=5
+	RANDOM_RANGE_MAX=25
+	random1=$(shuf -i $RANDOM_RANGE_MIN-$RANDOM_RANGE_MAX -n 1)
+	random2=$(shuf -i $RANDOM_RANGE_MIN-$RANDOM_RANGE_MAX -n 1)
+	strain=$1
+	num=$2
+	TEMPFILE="$random2.hopps"
+	
+	if [[ -z $1 ]]; then
+		echo "I need a strain name to associate to these target files!"
+		echo "Run this command like this:"
+		echo "   ./hopps task gen-target-files strain_file number_of_targets"
+		echo ""
+		echo "If you want me to generate a random number of target files, leave"
+		echo "that field blank!"
+		echo ""
+		return 1
+	fi
+	
+	if [[ -z $2 ]]; then
+		num=$random1
+	fi
+	
+	TaskHeader "Generating $num target files for Bogo"
+	
+	cd $HOPPS_CUBICAL
+	if [[ -e $TEMPFILE ]]; then
+		echo "Purging old temp file"
+		rm -f $TEMPFILE
+	fi
+	touch $TEMPFILE
+	x=1
+	
+	while [[ $x -le $num ]]; do
+		y=0
+		echo -ne "Target $x of $num:\\t"
+		random3=$(shuf -i $RANDOM_RANGE_MIN-$RANDOM_RANGE_MAX -n 1)
+		echo "UseStrain=$strain" >> $TEMPFILE
+		while [[ $y -le $random3 ]]; do
+			random4=$(shuf -i 10000-99999 -n 1)
+			echo "/tmp/target$random4" >> $TEMPFILE
+			((y++))
+		done
+		cat $TEMPFILE > "$BOGO_TARGETS_DIR/targets_hopps$random3.bogo"
+		echo -ne " $y entries\n"
+		rm -f $TEMPFILE
+		((x++))
+	done
+	echo ""
+	echo "Done!"
+}
+
+purge-target-files()
+# Delete all generated target files from the target folder
+{
+	x=0
+	TaskHeader "Purging generated target files"
+	for file in $BOGO_TARGETS_DIR/*; do
+		if [[ $file == *"hopps"* ]]; then
+			rm -f $file
+			((x++))
+		fi
+	done
+	echo "$x files removed"
+	echo ""
+}

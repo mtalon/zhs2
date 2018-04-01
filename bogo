@@ -2,7 +2,7 @@
 # Bogo version 2
 # Written by Michael Talon
 
-VERSION="RC3"
+VERSION="RC4"
 
 HitBanner()
 # Fancy banner to warn user of a hit operation
@@ -163,25 +163,25 @@ StrainBuild()
 		echo "...wait what the fuck? That shouldn't happen!"
 		Bug StrainBuild 133
 	fi
-	echo "==> $1"
+	Msg n 3 "> $1"
 	StrainConfigCheck $1
 	if [[ $? != 0 ]]; then
 		Msg n 4 "Build failed: errors in config"
 		return 1
 	fi
-	Msg n 4 "Config looks ok"
+	Msg n 5 "Config looks ok"
 	AssembleStrain $1
 	case $? in
-		0)	Msg n 4 "$StrainAlias is READY"
+		0)	Msg n 3 "> $StrainAlias is READY"
 			echo ""
 			return 0;;
-		1) 	Msg n 4 "Build failed"
+		1) 	Msg n 3 "> Build failed"
 			echo ""
 			return 3;;
-		2)	Msg n 4 "Build skipped"
+		2)	Msg n 3 "> Build skipped"
 			echo ""
 			return 4;;
-		*)	Msg n 4 "AssembleStrain: Bad return...?"
+		*)	Msg n 3 "> BUG: AssembleStrain: Bad return...?"
 			Bug StrainBuild 158;;
 	esac
 }
@@ -211,7 +211,7 @@ AssembleStrain()
 	
 	if [[ -e $BOGO_STRAINS_DIR/$StrainAlias ]]; then
 		Msg err 4 "$StrainAlias already exists in strains directory"
-		echo -ne "    Overwrite? (Y/N) "
+		echo -ne "        Overwrite? (Y/N) "
 		read aa
 		if [[ $aa != "Y" ]] && [[ $aa != "y" ]]; then
 			return 2
@@ -251,7 +251,7 @@ AssembleStrain()
 			cat $i >> $BOGO_STRAINS_DIR/$StrainAlias
 			echo -ne "\n" >> $BOGO_STRAINS_DIR/$StrainAlias
 		fi
-		Msg n 4 "Added ${i##$ZHS_BASE/}"
+		Msg n 5 "Added ${i##$ZHS_BASE/}"
 	done		
 	
 	if [[ ! -z $PrestageFile ]]; then
@@ -276,10 +276,10 @@ AssembleStrain()
 	case $Payload in
 		"none")
 			chmod +x $BOGO_STRAINS_DIR/$StrainAlias
-			Msg n 4 "Marking as executable"
+			Msg n 5 "Marking as executable"
 			;;
 		"self")
-			Msg n 4 "Treating final product as payload"
+			Msg n 5 "Treating final product as payload"
 			;;
 		"external")
 			if [[ ! -x $PayloadLocation ]]; then
@@ -301,7 +301,6 @@ AssembleStrain()
 			Msg n 8 "Correcting now"
 			chmod +x $ZHS_BASE/$ExecuteOnFail
 		fi
-		Msg n 4 "Execute if failed: $ExecuteOnFail"
 	fi
 	
 	if [[ ! -z $ExecuteOnSuccess ]]; then
@@ -315,7 +314,6 @@ AssembleStrain()
 			Msg n 8 "Correcting now"
 			chmod +x $ZHS_BASE/$ExecuteOnSuccess
 		fi
-		Msg n 4 "Execute if successful: $ExecuteOnSuccess"
 	fi
 }
 
@@ -340,23 +338,27 @@ StrainConfigCheck()
 {
 	if [[ $StrainIsSavage == "true" ]]; then
 		if [[ $BOGO_ALLOW_SAVAGE != "true" ]]; then
-			Msg err 4 "Not allowing savage strain to be built"
+			Msg err 5 "Not allowing savage strain to be built"
 			return 1
 		else
-			Msg n 4 "Strain marked as savage"
+			Msg n 5 "Strain marked as savage"
 		fi
 	fi
 	
+	if [[ $LaunchTheMissileNow == "true" ]]; then
+		Msg err 5 "EXECUTING STRAIN IMMEDIATELY AFTER BUILD COMPLETES"
+	fi
+	
 	if [[ $SkipStaging == "true" ]]; then
-		Msg n 4 "Staging will be skipped"
+		Msg n 5 "Staging will be skipped"
 	fi
 	
 	if [[ ! -z $PrestageFile ]]; then
 		if [[ ! -e $BOGO_STAGING_DIR/$PrestageFile ]]; then
-			Msg err 4 "Prestage file does not exist"
+			Msg err 5 "Prestage file does not exist"
 		elif [[ -d $PrestageFile ]]; then
 			local psnum=0
-			Msg n 4 "Reading contents of $PrestageFile"
+			Msg n 5 "Reading contents of $PrestageFile"
 			for file in $PrestageFile; do
 				if [[ $file == *".stage" ]]; then
 					prestage_bulk[$psnum]=$file
@@ -370,7 +372,7 @@ StrainConfigCheck()
 				Msg n 8 "Remember, I ignore any file that doesn't end in \".stage\"."
 			fi
 		else
-			Msg n 4 "Using prestaging file: $PrestageFile"
+			Msg n 5 "Prestaging. . . . . $PrestageFile"
 		fi
 	fi
 	
@@ -412,6 +414,8 @@ StrainConfigCheck()
 		Msg n 8 "or if you want to use the default staging file, specify"
 		Msg n 8 "\"default\"."
 		return 11
+	else
+		Msg n 5 "Staging . . . . . . $StagingFile"
 	fi
 	
 	if [[ ! -e $BOGO_STAGING_DIR/$StagingFile ]]; then
@@ -424,12 +428,16 @@ StrainConfigCheck()
 		Msg err 4 "I can't find ExecuteOnFail's script"
 		Msg n 8 "Make sure the path is relative to ZPD"
 		return 13
+	elif [[ ! -z $ExecuteOnFail ]]; then
+		Msg n 5 "Execute on failure  $ExecuteOnFail"
 	fi
 	
 	if [[ ! -z $ExecuteOnSuccess ]] && [[ ! -e $ZHS_BASE/$ExecuteOnSuccess ]]; then
 		Msg err 4 "I can't find ExecuteOnSuccess' script"
 		Msg n 8 "Make sure the path is relative to ZPD"
 		return 14
+	elif [[ ! -z $ExecuteOnSuccess ]]; then 
+		Msg n 5 "Execute on success  $ExecuteOnSuccess"
 	fi
 	
 	local x=0
@@ -461,7 +469,8 @@ MoveStrainFile()
 		*".strain")
 			mv $1 $ZHS_BASE/$BOGO_STRAINS_DIR;;
 		*)
-			Msg err 4 "BUG: Invalid file $1";;
+			Msg err 4 "BUG: Invalid file $1"
+			Bug MoveStrainFile 473;;
 	esac
 }
 
@@ -488,6 +497,7 @@ ExtractStrainArchive()
 		for file in "$1.arch/*"; do
 			MoveStrainFile $file
 		done
+		rm -rf $1.arch
 		Msg n 4 "Extraction successful\n"
 	fi
 }
@@ -536,7 +546,7 @@ UserList()
 {
 	case $1 in
 		"strains")
-			echo -ne "Listing strain config sfiles\n\n"
+			echo -ne "Listing strain config files\n\n"
 			dir1="$BOGO_STRAINS_DIR"
 			dir2=strain
 			;;
@@ -575,6 +585,26 @@ UserEdit()
 {
 	if [[ -z $1 ]]; then
 		echo -ne "Edit what?\n"
+		echo "Heres the syntax: bogo edit name.strain Parameter Value"
+		echo ""
+		echo "name.strain -> the strain file you want me to edit"
+		echo "Paramater   -> the variable you want to change"
+		echo "Value       -> what you want to set it to"
+		return 1
+	fi
+	
+	if [[ -z $2 ]]; then
+		echo -ne "What paramater do you want to set?\n"
+		return 1
+	fi
+	
+	if [[ "$2" == *"="* ]]; then
+		echo -ne "Don't include the equals sign. Separate it with a space\n"
+		return 1
+	fi
+	
+	if [[ -z $3 ]]; then
+		echo -ne "What do you want to set $2 to?\n"
 		return 1
 	fi
 	
@@ -616,6 +646,8 @@ HelpBrief()
 	echo "   build        Build strains without infecting"
 	echo "   list         List contents of our directories"
 	echo "   help         Print detailed usage information"
+	echo "   edit         Change parameters of a strain"
+	echo "   check        Check the syntax of strains and targets"
 	echo  ""
 	echo "ZPD                $ZHS_BASE"
 	echo "Targets directory  $BOGO_TARGETS_DIR"
@@ -655,10 +687,14 @@ CheckTargetStrain()
 
 TargetPathCheck()
 {
-	if [[ ! -e $1 ]]; then
+	if [[ $1 =~ "|" ]]; then
+		return 4
+	elif [[ ! -e $1 ]]; then
 		return 1
 	elif [[ ! -r $1 ]]; then
 		return 2
+	elif [[ ! -w $1 ]]; then
+		return 3
 	fi
 	
 }
@@ -668,9 +704,11 @@ ParseTargetFile()
 {
 	# Get rid of the trailing path to simplify output
 	local potarg=${1##$BOGO_TARGETS_DIR/}
+	local x1=0
+	local y1=0
 	case $potarg in
 		*"targets"*)
-			Msg n 4 "Reading $potarg"
+			Msg n 3 "> $potarg"
 			while IFS='' read -r line || [[ -n "$line" ]]; do
 				# Read the UseStrain variable
 				if [[ $line == "UseStrain="* ]]; then
@@ -688,30 +726,59 @@ ParseTargetFile()
 					else
 						TargetPathCheck $line
 						case $? in
+							4)	# Dont suppress output, this is bad
+								Msg err 4 "$line (Bad character in name)"
+								((target_nogo++));;
+							3)
+								if [[ $BOGO_SUPPRESS_OUTPUT != "true" ]]; then
+									Msg err 4 "$line (Exists but is unwritable)"
+								fi
+								((target_nogo++));;
 							2)
-								Msg err 4 "$line (Exists but is unreadable)"
+								if [[ $BOGO_SUPPRESS_OUTPUT != "true" ]]; then
+									Msg err 4 "$line (Exists but is unreadable)"
+								fi
 								((target_nogo++));;
 							1)
-								Msg err 4 "$line (Does not exist or is inaccessable)"
+								if [[ $BOGO_SUPPRESS_OUTPUT != "true" ]]; then
+									Msg err 4 "$line (Does not exist or is inaccessible)"
+								fi
 								((target_nogo++));;
 							0)
-								Msg lst 4 "$line"
+								if [[ $BOGO_SUPPRESS_OUTPUT != "true" ]]; then
+									Msg lst 4 "$line"
+								fi
 								targets_go[$bad]="$line"
-								((bad++));;
+								((bad++))
+								((y1++));;
 							*)
 								Msg n 4 "BUG: Bad return...?"
 								Bug ParseTargetFile 518;;
 						esac
 						target_strains[$total_targs]="$potarg|$UseStrain"
 						((total_targs++))
+						((x1++))
 					fi
 				fi
 			done < $1
 			if [[ -z $UseStrain ]]; then
 				Msg err 4 "No strain is associated with this target file"
 			fi
-			if [[ -z $targets_go ]]; then
-				Msg err 4 "No valid targets in this file!"
+			if [[ -z $targets_go ]] || [[ $y1 -eq 0 ]]; then
+				Msg n 3 "> No valid or accessible targets"
+			else
+				case $y1 in
+					1)
+						Msg n 3 "> Target accessible";;
+					2)
+						Msg n 3 "> Both targets accessible";;
+					*)
+						if [[ $y1 -eq $x1 ]]; then
+							Msg n 3 "> All targets accessible"
+						else
+							Msg n 3 "> $y1 of $x1 targets accessible"
+						fi;;
+				esac
 			fi
 			echo "";;
 			
@@ -734,8 +801,17 @@ ParseTargetFile()
 
 Prestage()
 {
-	# Very dangerous!
-	$BOGO_STAGING_DIR/$1 &> _bogo.tmp
+	if [[ ! -e $BOGO_STAGING_DIR/$1 ]]; then
+		Msg err 4 "BUG: Prestage file missing!?"
+		Bug Prestage 739
+	fi
+	
+	if [[ ! -z $PrestageArgs ]]; then
+		$BOGO_STAGING_DIR/$1 $PrestageArgs &> _bogo.tmp
+	else
+		$BOGO_STAGING_DIR/$1 &> _bogo.tmp
+	fi
+	
 	local x=$?
 	st=$1
 	while IFS='' read -r line || [[ -n "$line" ]]; do
@@ -749,12 +825,44 @@ HitStage()
 {
 	local targ=$1
 	local strain=$2
+	local fail=false
+	
 	SourceStrain $strain
 	if [[ $? != 0 ]]; then
-		Error warn "Failed to source $strain"
-		echo "...wait what the fuck? That shouldn't happen!"
+		Msg err 4 "Failed to source $strain"
+		Msg n 4 "...wait what the fuck? That shouldn't happen!"
 		Bug HitStage 606
 	fi	
+	if [[ ! -e $targ ]]; then
+		Msg err 4 "Target not accessible!"
+		fail=true
+	fi
+	
+	if [[ ! -r $targ ]]; then
+		Msg err 4 "Can't read target!"
+		fail=true
+	fi
+	
+	if [[ ! -w $targ ]]; then
+		Msg err 4 "Can't write to target!"
+		fail=true
+	fi
+	
+	if [[ $fail == true ]]; then
+			case $BOGO_ONFAIL in
+				"continue")
+					return 1;;
+				"abort")
+					return 2;;
+				"ignore")
+					break;;
+				*)
+					Msg err 4 "BUG: BOGO_ONFAIL set to $BOGO_ONFAIL?"
+					Msg n 4 "Why was this not checked??"
+					return 2;;
+			esac
+	fi
+	
 	
 	case $Payload in
 		"none")
@@ -766,10 +874,16 @@ HitStage()
 			if [[ $SkipStaging != "true" ]]; then 
 				Msg n 4 "Executing external staging file"
 				if [[ -z $StagingFile ]]; then
-					Msg err 4 "Where did our staging file go??"
+					Msg err 4 "BUG: Where did our staging file go??"
 					Bug HitStage 617
 				fi
-				$BOGO_STAGING_DIR/$StagingFile &> _bogo.tmp
+				
+				# If we have extra arguments, add them 
+				if [[ ! -z $StagingArgs ]]; then
+					$BOGO_STAGING_DIR/$StagingFile $StagingArgs &> _bogo.tmp
+				else
+					$BOGO_STAGING_DIR/$StagingFile &> _bogo.tmp
+				fi
 				x=$?
 			else
 				Msg n 4 "Skipping staging as requested"
@@ -796,6 +910,9 @@ HitStage()
 			else
 				Msg n 4 "Executing post-failure script"
 				$ExecuteOnFail &> _bogo.tmp
+				while IFS='' read -r line || [[ -n "$line" ]]; do
+					Msg n 4 "> $line"
+				done < _bogo.tmp
 			fi
 		fi
 		return 1
@@ -807,7 +924,10 @@ HitStage()
 				Bug HitStage 731
 			else
 				Msg n 4 "Executing post-success script"
-				$ExecuteOnSuccess
+				$ExecuteOnSuccess &> _bogo.tmp
+				while IFS='' read -r line || [[ -n "$line" ]]; do
+					Msg n 4 "> $line"
+				done < _bogo.tmp
 			fi
 		fi
 		return 0
@@ -863,6 +983,11 @@ UserHit()
 				return 1
 			fi
 	esac
+	
+	if [[ $total_targs -eq 0 ]]; then
+		echo -ne "\nThere are no target files in target directory!\n"
+		return 1
+	fi
 	
 	if [[ -z $target_strains ]]; then
 		echo -ne "Aborting hit operation - "
@@ -921,12 +1046,12 @@ UserHit()
 	fi
 	
 	if [[ -z $targets_go ]] && [[ ! -z $staging_go ]]; then
-		Error warn "There are no accessable targets for me to hit;"
+		Error warn "There are no accessible targets for me to hit;"
 		Msg n 9 "I'll assume this will be corrected during pre-staging."
 		Msg n 9 "See \"bogo help staging\" for more information\n"
 		flag_recheck=true
 	elif [[ $target_nogo != 0 ]]; then
-		Error note "$target_nogo out of $total_targs target(s) are inaccessable"
+		Error note "$target_nogo out of $total_targs target(s) are inaccessible"
 		if [[ ! -z $staging_go ]]; then
 			Msg n 6 "I'll re-check if I can access these targets after pre-staging."
 			Msg n 6 "See \"bogo help staging\" for more information\n"
@@ -948,7 +1073,7 @@ UserHit()
 			esac 
 		done
 	elif [[ -z $targets_go ]]; then
-		Error warn "There are no accessable targets for me to hit, and their"
+		Error warn "There are no accessible targets for me to hit, and their"
 		Msg n 9 "associated strain(s) have no pre-staging defined that could"
 		Msg n 9 "correct this.\n"
 		Msg n 9 "If the target file(s) are not just simply blank," 
@@ -1001,10 +1126,10 @@ UserHit()
 			Msg err 4 "Target $i exists in ZPD!"
 		elif [[ ! -r $i ]]; then
 			Msg err 4 "Target $i is unreadable"
-			Msg n 8 "Infection will fail unless this is corrected in staging"
+			Msg n 8 "Infection will fail unless this is accounted for during staging"
 		elif [[ ! -w $i ]]; then
 			Msg err 4 "Target $i is unwritable"
-			Msg n 8 "Infection will fail unless this is corrected in staging"
+			Msg n 8 "Infection will fail unless this is accounted for during staging"
 		fi
 	done
 	echo -ne "    \\tPath\\t\\t\\tStrain\\t\n"
@@ -1014,10 +1139,21 @@ UserHit()
 	for iz in ${targets_go[@]}; do
 		echo -ne "    $x\\t"
 		echo -ne "$iz\\t"
+		
 		# In the form of "target|strain"
 		targ=${target_strains[$y]%|*}
-		#targ=${j%|*}
 		strain=${target_strains[$y]#*|}
+		
+		if [[ ! -e $BOGO_TARGETS_DIR/$targ ]]; then
+			Msg err 4 "BUG: Aah! $targ is not a target!"
+			Bug UserHit 1076
+		fi
+		
+		if [[ ! -e $BOGO_STRAINS_DIR/$strain ]]; then
+			Msg err 4 "BUG: Aah! $strain is not a strain!"
+			Bug UserHit 1081
+		fi
+		
 		# Find out which target file the target came from
 		if [[ $(cat $BOGO_TARGETS_DIR/$targ | grep $iz) ]]; then
 			echo -ne "$strain"
@@ -1055,23 +1191,26 @@ UserHit()
 	Msg n 3 "Press ENTER to continue, or CONTROL + C to abort."
 	read ab
 	
-	# Fix this. Oh my god please fix this.
 	local cnt=0
 	for i in ${targets_go[@]}; do
 		targ=${target_strains[$cnt]%|*}
 		strain=${target_strains[$cnt]#*|}
+		
 		if [[ $(cat $BOGO_TARGETS_DIR/$targ | grep $i) ]]; then
 			((cnt++))
-			Banner " $cnt/${#targets_go[@]}  ::  INFECTING $i"
+			Banner " $cnt/${#targets_go[@]}  ::  $i"
 			HitStage $i $strain
-			if [[ $? != 0 ]]; then
-				Msg n 4 "INFECTION FAILED\n"
-				if [[ $BOGO_ON_FAIL == "abort" ]]; then
-					break
-				fi
-			else
-				Msg n 4 "Infection successful\n"
-			fi
+			case $? in
+				1)
+					Msg n 4 "INFECTION FAILED";;
+				2)
+					Msg n 4 "INFECTION FAILED - ABORTING";;
+				0)
+					Msg n 4 "Infection successful";;
+				*)
+					Msg n 4 "BUG: BAD RETURN FROM HITSTAGE: $?"
+					Bug UserHit 1128;;
+			esac
 		fi
 	done
 	
@@ -1090,7 +1229,7 @@ Bug()
 	echo "   good:              $good"
 	echo ""
 	echo "   x.y:               $x.$y"
-	echo ""./
+	echo ""
 	echo "   strain:            $strain"
 	echo "   targ:              $targ"
 	echo ""
@@ -1121,7 +1260,7 @@ UserCheck()
 			for file in $BOGO_TARGETS_DIR/*; do
 				ParseTargetFile $file
 			done
-			echo "${#targets_go[@]} out of $total_targs targets are accessable"
+			echo "${#targets_go[@]} out of $total_targs targets are accessible"
 			;;
 		strain-config)
 			if [[ -z $2 ]]; then
@@ -1150,8 +1289,9 @@ UserCheck()
 			StrainPurgeConfig
 			;;
 		*)
-			# Obvious placeholder is obvious
-			echo "You're dumb"
+			echo "Check what?"
+			echo "Targets accessability?  -> bogo check targets"
+			echo "Test a strain file?     -> bogo check strain-config strainname.strain"
 			;;
 	esac
 }
@@ -1198,51 +1338,7 @@ HelpThorough()
 	case $1 in
 	"strains")
 	echo "
-   Wilde refers to the payload expected to be executed under my direction.
-   Every variation of wilde is referred as a strain, which can be
-      - written entirely by the user,
-      - 'built' from modules in the directory
-      - some combination of the two
    
-   Any strain, or script you want me to manage, needs to have a .strain
-   file associated to it in the strains directory. Look at example.strain
-   for an example.
-   This file needs the following fields:
-      - WildeAlias=\"string\"
-        The name of the final executable
-        
-      - WildeIsSavage=\"boolean\" (Not totally implemented yet)
-        Set to true if the script is expected to cause damage
-        
-      - WildeIsLeashed=\"boolean\" (Not implemented yet)
-        Set to true if you want me or hopps to track and/or limit the
-        script's progress
-        
-      - ModInclude=\"(array)\"
-        Give the paths to each componet of wilde relative to the ZPD
-        directory, seperating each entry with a space.
-        If the componet is a script, I execute it and pipe its output
-        to the final product. Otherwise, I simply cat the component's
-        contents.
-        
-      - Payload=\"string\"
-        Set to one of the following:
-        \"none\"     -> I execute the final executable directly
-        \"self\"     -> The final executable is the payload to be exectued
-                      by the victim
-        \"external\" -> The payload is an external file
-        
-      - PayloadLocation=\"string\"
-        If Payload is set to external, specify the direct path to it
-      
-      - RequireStaging=\"boolean\"
-        If I need to do something fancy to deploy the strain, set this
-        to true and create a script for me to execute.
-        I refer to this as staging.
-        
-      - StagingFile=\"string\"
-        If this strain requires staging, specify the direct path to
-        the staging file you need me to execute
 	";;
 	"hit")
 	echo "
@@ -1267,6 +1363,8 @@ HelpThorough()
    want me to infect, one target per line.
    Somewhere in this file should be line the \"UseStrain=x\", with x
    being the strainfile you want me to use to infect these targets.
+   (I recommend it being the first line of the file, but I really dont care
+   as long as its there.)
    
    Target files are in the form \"targets_x.bogo\", with x being whatever
    name you want. I will IGNORE any file that does not follow this convention.
@@ -1280,6 +1378,25 @@ HelpThorough()
    I refer to any payload or script that you want to be executed under my 
    direction as \"wilde\".
 ";;
+	"edit")
+	echo "
+   bogo edit [strainfile] [parameter] [value]
+   
+      [strainfile] is the full name of the strain file you want to edit.
+                   It must be in the strains directory for me to find it
+                   
+      [parameter]  is the variable you want to change.
+                   For example, \"StrainAlias\". Dont include the equals
+                   sign. If its not in the strain file, dont worry, I'll
+                   add it in.
+
+      [value]      is what you want me to set the parameter to.
+                   Again, no equals sign is needed.
+	               
+   Example: change parameter StrainAlias in test.strain to \"test\"
+      bogo edit test.strain StrainAlias test
+               
+   ";;
 	*)
 	echo "
    My name is Chief Bogo, and I manage the execution and distribution

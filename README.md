@@ -12,9 +12,7 @@ Bogo is the star of the show. He orchestrates everything, and you'll be interfac
 
 Users, directories, files, and other "nouns" you want to infect with a payload are called "targets".
 
-Targets are listed in a target file contained within the target directory. See target.d for examples.
-
-Basically its just a list of names, plus the name of the strain you want to infect those targets with.
+Targets are listed in a target file contained within the target directory. See target.d for examples. Targets are basically just a list of names, plus the name of the strain you want to infect those targets with.
 
 A strain is a piece of malware you want Bogo to manage. 
 

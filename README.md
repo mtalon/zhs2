@@ -10,6 +10,8 @@ of code.
 # Overview
 Bogo is the star of the show. He orchestrates everything, and you'll be interfacing with him.
 
+As of this last edit, Hopps is only used for minor debugging and cleaning up (and parking duty). She'll have a more prominent role in the future.
+
 Users, directories, files, and other "nouns" you want to infect with a payload are called "targets".
 
 Targets are listed in a target file contained within the target directory. See target.d for examples. Targets are basically just a list of names, plus the name of the strain you want to infect those targets with.

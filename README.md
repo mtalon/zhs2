@@ -26,7 +26,7 @@ If its really simple, the payload can just be a simple script. It can also be sn
 into one script. Ideally you want to keep these in a directory, but you don't have to.
 
 Bogo is very flexible with strains. He can work with very sophisticated setups with conditional payloads, or very simple ones.
-Prewritten examples are provided in this repository, but I highly encorage that you use them as framework to write your own for your own application.
+Prewritten examples are provided in this repository, but I highly encourage that you use them as framework to write your own for your own application.
 
 # Quickstart
 - Pull the repo
